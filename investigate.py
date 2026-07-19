@@ -44,17 +44,17 @@ def load_signature_crop(sheet_name, row_index, img_folder="signing_sheets"):
 
     h, w = img.shape
     # Mirror the logic in SigningSheetProcessor
-    top    = int(h * 0.08)
-    bot    = int(h * 0.92)
-    sig_x0 = int(w * 0.65)
+    top    = int(h * 0.28)
+    bot    = int(h * 0.72)
+    sig_x0 = int(w * 0.71)
 
-    # Divide body evenly into 20 rows (same default)
-    num_rows = 20
-    row_h    = (bot - top) // num_rows
-    y1       = top + row_index * row_h
+    # Divide body evenly into 6 rows (excluding header)
+    num_rows = 6
+    row_h    = (bot - top) // 7  # 7 physical rows including header
+    y1       = top + (row_index + 1) * row_h  # +1 to skip header
     y2       = y1 + row_h
 
-    cell = img[y1:y2, sig_x0:w]
+    cell = img[y1:y2, sig_x0:int(w*0.92)]
     if cell.size == 0:
         return None
 
