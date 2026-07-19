@@ -98,7 +98,7 @@ class SigningSheetProcessor:
     """
 
     THUMB_W  = 900          # width for display / saving thumbnails
-    SIG_COL_FRAC = (0.65, 1.0)   # signature column occupies rightmost 35%
+    SIG_COL_FRAC = (0.71, 0.92)   # signature column occupies rightmost portion
 
     def __init__(self, image_path, sheet_name):
         self.image_path = image_path
@@ -196,10 +196,10 @@ class SigningSheetProcessor:
         # Horizontal projection: count ink pixels per row
         h_proj = np.sum(bin_desk, axis=1)
 
-        # Adaptive: find the body of the table by ignoring top/bottom 10%
+        # Adaptive: find the body of the table by ignoring top/bottom parts
         h, w = deskewed.shape
-        top_margin    = int(h * 0.08)
-        bottom_margin = int(h * 0.92)
+        top_margin    = int(h * 0.28)
+        bottom_margin = int(h * 0.72)
         table_region  = h_proj[top_margin:bottom_margin]
 
         # Mean-threshold to find blank (separator) rows
@@ -283,8 +283,8 @@ class SigningSheetProcessor:
             total_px = cell.size
             density  = ink_px / total_px
 
-            # Presence threshold: >2% ink pixels → signed
-            present  = density > 0.02
+            # Presence threshold: >0.5% ink pixels → signed
+            present  = density > 0.005
 
             # Place cell in strip
             cy = i * cell_h
@@ -332,7 +332,13 @@ class SigningSheetProcessor:
         binary   = self.step4_binarize(blurred)
         morph    = self.step5_morphology(binary)
         deskewed = self.step6_deskew(grey, morph)
-        rows, bin_desk = self.step7_detect_rows(deskewed, len(students))
+        # Detect num_students + 1 rows to account for the table header row
+        rows, bin_desk = self.step7_detect_rows(deskewed, len(students) + 1)
+        
+        # Discard the first row which is the table header
+        if len(rows) > len(students):
+            rows = rows[1:]
+            
         results  = self.step8_extract_signatures(deskewed, bin_desk, rows)
         self.step9_annotate(results, students)
         print("── Pipeline Complete ───────────────────────────────────────\n")
