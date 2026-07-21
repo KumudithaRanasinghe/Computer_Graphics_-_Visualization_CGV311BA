@@ -186,112 +186,177 @@ class SigningSheetProcessor:
 
     def step7_detect_rows(self, deskewed, num_students):
         """
-        Step 7 – Detect table rows.
-        Uses horizontal projection profile to find row separators,
-        then splits image into row-height bands equal to num_students rows.
+        Step 7 – Detect table rows using multi-kernel horizontal projection,
+        identifying the double separator line, and extracting student data rows
+        while skipping the column header.
         """
-        # Binarize the deskewed image fresh
+        h, w = deskewed.shape
         _, bin_desk = cv2.threshold(deskewed, 0, 255,
                                      cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-        # Horizontal projection: count ink pixels per row
-        h_proj = np.sum(bin_desk, axis=1)
 
-        # Adaptive: find the body of the table by ignoring top/bottom parts
-        h, w = deskewed.shape
-        top_margin    = int(h * 0.28)
-        bottom_margin = int(h * 0.72)
-        table_region  = h_proj[top_margin:bottom_margin]
+        # Multi-kernel horizontal line detection
+        all_h = set()
+        for kw_frac in [4, 5, 6, 7]:
+            h_kern = cv2.getStructuringElement(cv2.MORPH_RECT, (w // kw_frac, 1))
+            h_mask = cv2.morphologyEx(bin_desk, cv2.MORPH_OPEN, h_kern)
+            h_proj = np.sum(h_mask, axis=1) / 255
+            thresh = w * 0.10
+            for r in np.where(h_proj > thresh)[0]:
+                all_h.add(r)
 
-        # Mean-threshold to find blank (separator) rows
-        mean_ink = np.mean(table_region)
-        separator_rows = np.where(table_region < mean_ink * 0.3)[0] + top_margin
-
-        # Cluster consecutive separator rows into groups → find gaps
-        row_bounds = []
-        if len(separator_rows) > 0:
-            groups = []
-            g = [separator_rows[0]]
-            for r in separator_rows[1:]:
-                if r - g[-1] < 10:
+        all_h_sorted = sorted([r for r in all_h if h * 0.15 < r < h * 0.65])
+        hgroups = []
+        if len(all_h_sorted) > 0:
+            g = [all_h_sorted[0]]
+            for r in all_h_sorted[1:]:
+                if r - g[-1] < 15:
                     g.append(r)
                 else:
-                    groups.append(g)
+                    hgroups.append(g)
                     g = [r]
-            groups.append(g)
-            # Each group's median is a row boundary
-            for grp in groups:
-                row_bounds.append(int(np.median(grp)))
+            hgroups.append(g)
+        hmids = [int(np.median(grp)) for grp in hgroups]
 
-        # If we couldn't find enough separators, divide evenly
-        if len(row_bounds) < num_students - 1:
-            row_bounds = [top_margin + int((bottom_margin - top_margin)
-                          * i / num_students)
-                          for i in range(1, num_students)]
+        # Find double-line separator (thin gap between title header & column headers)
+        gaps = [hmids[j+1] - hmids[j] for j in range(len(hmids)-1)]
+        median_gap = np.median(gaps) if gaps else 80
+        double_seps = [gi for gi, gap in enumerate(gaps) if gap < median_gap * 0.55]
 
-        # Build (start, end) pairs
-        starts = [top_margin]    + row_bounds
-        ends   = row_bounds      + [bottom_margin]
-        rows   = list(zip(starts, ends))
+        if not double_seps:
+            min_gap_idx = np.argmin(gaps) if gaps else 0
+            double_seps = [min_gap_idx]
 
-        # Keep only num_students rows
-        rows = rows[:num_students]
-        while len(rows) < num_students:
-            # pad by subdividing last row if needed
-            last = rows[-1]
-            mid  = (last[0] + last[1]) // 2
-            rows[-1] = (last[0], mid)
-            rows.append((mid, last[1]))
+        ds_idx = double_seps[-1]
+        after_ds = hmids[ds_idx+1:]
+
+        if len(after_ds) > 3:
+            after_gaps = [after_ds[j+1] - after_ds[j] for j in range(len(after_ds)-1)]
+            med_after = np.median(after_gaps)
+            filtered_after = [after_ds[0]]
+            for idx in range(1, len(after_ds)):
+                gap = after_ds[idx] - filtered_after[-1]
+                if gap < med_after * 3.0:
+                    filtered_after.append(after_ds[idx])
+            after_ds = filtered_after
+
+        col_header_top = after_ds[0] if len(after_ds) > 0 else int(h * 0.3)
+        col_header_bot = after_ds[1] if len(after_ds) > 1 else int(h * 0.35)
+        student_data_lines = after_ds[1:] if len(after_ds) > 1 else after_ds
+
+        rows = [(student_data_lines[j] + 8, student_data_lines[j+1] - 8)
+                for j in range(len(student_data_lines)-1)]
+
+        # Vertical line detection for signature column
+        table_top = hmids[0] if hmids else int(h * 0.2)
+        table_bot = after_ds[-1] if after_ds else int(h * 0.6)
+        v_height = table_bot - table_top
+
+        v_kern = cv2.getStructuringElement(cv2.MORPH_RECT, (1, max(v_height // 3, 10)))
+        v_region = bin_desk[table_top:table_bot, :]
+        v_mask = cv2.morphologyEx(v_region, cv2.MORPH_OPEN, v_kern)
+        v_proj = np.sum(v_mask, axis=0) / 255
+        v_cols = np.where(v_proj > v_height * 0.10)[0]
+
+        vgroups = []
+        if len(v_cols) > 0:
+            vg = [v_cols[0]]
+            for c in v_cols[1:]:
+                if c - vg[-1] < 30:
+                    vg.append(c)
+                else:
+                    vgroups.append(vg)
+                    vg = [c]
+            vgroups.append(vg)
+        vmids = [int(np.median(grp)) for grp in vgroups]
+
+        if len(vmids) < 6:
+            v_kern2 = cv2.getStructuringElement(cv2.MORPH_RECT, (1, max(v_height // 5, 10)))
+            v_mask2 = cv2.morphologyEx(v_region, cv2.MORPH_OPEN, v_kern2)
+            v_proj2 = np.sum(v_mask2, axis=0) / 255
+            v_cols2 = np.where(v_proj2 > v_height * 0.06)[0]
+            vgroups2 = []
+            if len(v_cols2) > 0:
+                vg = [v_cols2[0]]
+                for c in v_cols2[1:]:
+                    if c - vg[-1] < 30:
+                        vg.append(c)
+                    else:
+                        vgroups2.append(vg)
+                        vg = [c]
+                vgroups2.append(vg)
+            vmids = [int(np.median(grp)) for grp in vgroups2]
+
+        if len(vmids) >= 2:
+            sig_full_left = vmids[-2]
+            sig_full_right = vmids[-1]
+            sig_col_width = sig_full_right - sig_full_left
+            sig_left = sig_full_left + int(sig_col_width * 0.20) + 5
+            sig_right = sig_full_right - 10
+        else:
+            sig_left = int(w * 0.71)
+            sig_right = int(w * 0.92)
+
+        self.sig_bounds = (sig_left, sig_right)
 
         # Visualise rows on a colour copy
         vis = cv2.cvtColor(deskewed, cv2.COLOR_GRAY2BGR)
         for y1, y2 in rows:
-            cv2.line(vis, (0, y1), (w, y1), (0, 200, 0), 2)
-        cv2.line(vis, (0, bottom_margin), (w, bottom_margin), (0, 200, 0), 2)
+            cv2.rectangle(vis, (sig_left, y1), (sig_right, y2), (0, 255, 0), 2)
+        cv2.line(vis, (sig_left, table_top), (sig_left, table_bot), (255, 0, 0), 2)
+        cv2.line(vis, (sig_right, table_top), (sig_right, table_bot), (255, 0, 0), 2)
 
-        # Mark signature column boundary
-        sig_x = int(w * self.SIG_COL_FRAC[0])
-        cv2.line(vis, (sig_x, top_margin), (sig_x, bottom_margin), (255, 0, 0), 3)
         self._save_step("07_row_detection", vis)
-        self.rows       = rows
-        self.table_w    = w
-        self.table_top  = top_margin
-        self.table_bot  = bottom_margin
+        self.rows      = rows
+        self.table_w   = w
+        self.table_top = table_top
+        self.table_bot = table_bot
         return rows, bin_desk
 
     def step8_extract_signatures(self, deskewed, binary, rows):
         """
-        Step 8 – Crop signature cells and measure ink density.
-        Returns list of (row_img, ink_density, present_bool).
+        Step 8 – Crop signature cells, apply morphological line artifact removal,
+        and measure ink density.
+        Returns list of (cell_c, ink_density, present_bool).
         """
-        w         = deskewed.shape[1]
-        sig_x0    = int(w * self.SIG_COL_FRAC[0])
-        sig_x1    = int(w * self.SIG_COL_FRAC[1])
-        results   = []
+        sig_x0, sig_x1 = self.sig_bounds
+        results        = []
 
-        # Compose a side-by-side strip for visualisation
-        cell_h    = max((r[1] - r[0]) for r in rows)
-        strip_h   = cell_h * len(rows)
-        strip_w   = sig_x1 - sig_x0
-        strip     = np.ones((strip_h, strip_w), dtype=np.uint8) * 255
+        cell_h  = max((r[1] - r[0]) for r in rows) if rows else 50
+        strip_h = cell_h * len(rows) if rows else 50
+        strip_w = max(sig_x1 - sig_x0, 50)
+        strip   = np.zeros((strip_h, strip_w), dtype=np.uint8)
 
         for i, (y1, y2) in enumerate(rows):
-            cell     = binary[y1:y2, sig_x0:sig_x1]
+            cell = binary[y1:y2, sig_x0:sig_x1]
             if cell.size == 0:
                 results.append((None, 0.0, False))
                 continue
-            ink_px   = np.sum(cell > 0)
-            total_px = cell.size
-            density  = ink_px / total_px
 
-            # Presence threshold: >0.5% ink pixels → signed
-            present  = density > 0.005
+            cell_h_cur, cell_w_cur = cell.shape
+
+            # Clean horizontal table line artifacts
+            h_clean = cv2.getStructuringElement(cv2.MORPH_RECT, (max(cell_w_cur * 2 // 3, 5), 1))
+            h_artifacts = cv2.morphologyEx(cell, cv2.MORPH_OPEN, h_clean)
+            cell_c = cv2.subtract(cell, h_artifacts)
+
+            # Clean vertical table line artifacts
+            v_clean = cv2.getStructuringElement(cv2.MORPH_RECT, (1, max(cell_h_cur * 2 // 3, 5)))
+            v_artifacts = cv2.morphologyEx(cell_c, cv2.MORPH_OPEN, v_clean)
+            cell_c = cv2.subtract(cell_c, v_artifacts)
+
+            ink_px   = np.sum(cell_c > 0)
+            total_px = cell_c.size
+            density  = ink_px / total_px if total_px > 0 else 0.0
+
+            # Presence threshold: >2.0% ink density in cleaned signature cell → signed
+            present  = density > 0.02
 
             # Place cell in strip
             cy = i * cell_h
-            ch = min(cell_h, cell.shape[0])
-            cw = min(strip_w, cell.shape[1])
-            strip[cy:cy+ch, :cw] = cell[:ch, :cw]
-            results.append((cell, density, present))
+            ch = min(cell_h, cell_c.shape[0])
+            cw = min(strip_w, cell_c.shape[1])
+            strip[cy:cy+ch, :cw] = cell_c[:ch, :cw]
+            results.append((cell_c, density, present))
 
         self._save_step("08_signature_cells", strip)
         return results
@@ -299,12 +364,10 @@ class SigningSheetProcessor:
     def step9_annotate(self, results, students):
         """Step 9 – Annotate the original image with P/A markers."""
         annotated = self.original.copy()
-        h, w      = annotated.shape[:2]
-        rows      = self.rows
-        sig_x0    = int(w * self.SIG_COL_FRAC[0])
+        sig_x0, sig_x1 = getattr(self, 'sig_bounds', (int(annotated.shape[1] * 0.71), int(annotated.shape[1] * 0.92)))
 
-        for i, (y1, y2) in enumerate(rows):
-            if i >= len(students):
+        for i, (y1, y2) in enumerate(self.rows):
+            if i >= len(students) or i >= len(results):
                 break
             _, density, present = results[i]
             label  = "PRESENT" if present else "ABSENT"
@@ -314,8 +377,7 @@ class SigningSheetProcessor:
             cv2.putText(annotated, label,
                         (sig_x0 + 10, cy),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.2, colour, 3)
-            # density bar
-            bar_w = int(density * 200)
+            bar_w = int(density * 500)
             cv2.rectangle(annotated, (sig_x0 + 200, cy - 20),
                           (sig_x0 + 200 + bar_w, cy - 5), colour, -1)
 
@@ -332,13 +394,8 @@ class SigningSheetProcessor:
         binary   = self.step4_binarize(blurred)
         morph    = self.step5_morphology(binary)
         deskewed = self.step6_deskew(grey, morph)
-        # Detect num_students + 1 rows to account for the table header row
-        rows, bin_desk = self.step7_detect_rows(deskewed, len(students) + 1)
         
-        # Discard the first row which is the table header
-        if len(rows) > len(students):
-            rows = rows[1:]
-            
+        rows, bin_desk = self.step7_detect_rows(deskewed, len(students))
         results  = self.step8_extract_signatures(deskewed, bin_desk, rows)
         self.step9_annotate(results, students)
         print("── Pipeline Complete ───────────────────────────────────────\n")
