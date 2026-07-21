@@ -15,7 +15,32 @@ import sqlite3
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from skimage.metrics import structural_similarity as ssim
+# Pure OpenCV / NumPy SSIM implementation (no skimage dependency required)
+def compute_ssim(img1, img2):
+    """Compute Structural Similarity Index (SSIM) between two grayscale images [0, 1]."""
+    C1 = (0.01 * 1.0) ** 2
+    C2 = (0.03 * 1.0) ** 2
+
+    img1 = img1.astype(np.float32)
+    img2 = img2.astype(np.float32)
+
+    kernel_size = (11, 11)
+    sigma = 1.5
+
+    mu1 = cv2.GaussianBlur(img1, kernel_size, sigma)
+    mu2 = cv2.GaussianBlur(img2, kernel_size, sigma)
+
+    mu1_sq = mu1 ** 2
+    mu2_sq = mu2 ** 2
+    mu1_mu2 = mu1 * mu2
+
+    sigma1_sq = cv2.GaussianBlur(img1 ** 2, kernel_size, sigma) - mu1_sq
+    sigma2_sq = cv2.GaussianBlur(img2 ** 2, kernel_size, sigma) - mu2_sq
+    sigma12 = cv2.GaussianBlur(img1 * img2, kernel_size, sigma) - mu1_mu2
+
+    ssim_map = ((2 * mu1_mu2 + C1) * (2 * sigma12 + C2)) / ((mu1_sq + mu2_sq + C1) * (sigma1_sq + sigma2_sq + C2))
+    return float(ssim_map.mean())
+
 
 DB_FILE = "attendance.db"
 SIG_DIR = "outputs/processing_steps"
@@ -88,9 +113,8 @@ def compute_similarity(sig1, sig2):
         return 0.0
     # Ensure same size
     s2 = cv2.resize(sig2, (sig1.shape[1], sig1.shape[0]))
-    score, _ = ssim(sig1.astype(np.float32) / 255.0,
-                    s2.astype(np.float32)  / 255.0,
-                    full=True, data_range=1.0)
+    score = compute_ssim(sig1.astype(np.float32) / 255.0,
+                         s2.astype(np.float32)  / 255.0)
     return float(score)
 
 
