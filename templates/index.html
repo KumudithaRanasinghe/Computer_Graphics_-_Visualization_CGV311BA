@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAMS — Student Attendance Management & Image Analytics</title>
+    <!-- Modern Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js for visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <!-- Top Navbar -->
+    <nav class="navbar">
+        <a href="/" class="nav-brand">
+            <div class="brand-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+            </div>
+            <span>SAMS <span style="color: var(--primary);">Analytics</span></span>
+        </a>
+
+        <div class="nav-actions">
+            <button class="btn btn-secondary" onclick="loadSampleSheets()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                Process Sample Sheets
+            </button>
+            <button class="btn btn-danger" onclick="confirmClearData()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                Clear Database
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container">
+
+        <!-- Hero Header -->
+        <header class="hero">
+            <div>
+                <h1 class="hero-title">Student Attendance Management System</h1>
+                <p class="hero-subtitle">Automated signature extraction, threshold binarization & Computer Vision analytics for attendance signing sheets.</p>
+            </div>
+            <div>
+                <span id="db-status-badge" class="badge badge-success pulse">
+                    <span style="display:inline-block; width:8px; height:8px; background:#10b981; border-radius:50%;"></span>
+                    Database Active
+                </span>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <div class="tabs-nav">
+            <button class="tab-btn active" onclick="switchTab('upload')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                Input & Process Images
+            </button>
+            <button class="tab-btn" onclick="switchTab('summary')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                Attendance Summary
+            </button>
+            <button class="tab-btn" onclick="switchTab('inspector')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                CV Pipeline Inspector
+            </button>
+        </div>
+
+        <!-- TAB 1: UPLOAD & PROCESS -->
+        <div id="tab-upload" class="tab-panel active">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                        Upload Signing Sheets & XML Metadata
+                    </h2>
+                </div>
+
+                <form id="upload-form" onsubmit="handleUploadSubmit(event)">
+                    <!-- Dropzone -->
+                    <div class="upload-zone" id="dropzone" onclick="document.getElementById('image-input').click()">
+                        <div class="upload-icon">
+                            <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+                        </div>
+                        <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.4rem;">Drag and drop signing sheet images here</h3>
+                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Supports JPG, JPEG, PNG format images (e.g. 1.jpeg, 2.jpeg)</p>
+                        <button type="button" class="btn btn-secondary">Browse Image Files</button>
+                        
+                        <input type="file" id="image-input" name="images" multiple accept="image/*" style="display: none;" onchange="updateSelectedFilesList()">
+                    </div>
+
+                    <div style="margin-top: 1.5rem; display: flex; gap: 1rem; align-items: center;">
+                        <div style="flex: 1;">
+                            <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 600;">
+                                Session XML Metadata (Optional - defaults to info.xml)
+                            </label>
+                            <input type="file" id="xml-input" name="xml_file" accept=".xml" style="background: rgba(15,23,42,0.8); border: 1px solid var(--glass-border); padding: 0.6rem 1rem; border-radius: var(--radius-md); color: var(--text-main); width: 100%;">
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="margin-top: 1.2rem; min-width: 180px;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Process Sheets
+                        </button>
+                    </div>
+
+                    <!-- Selected Files Badge List -->
+                    <div id="selected-files-list" class="file-badge-list"></div>
+                </form>
+            </div>
+
+            <!-- Processing Progress Banner -->
+            <div id="processing-card" class="card processing-card">
+                <div class="card-header">
+                    <h3 class="card-title" id="processing-status-title">Processing Signing Sheets...</h3>
+                </div>
+                <div class="progress-bar-bg">
+                    <div id="progress-bar-fill" class="progress-bar-fill"></div>
+                </div>
+                <p id="processing-msg" style="color: var(--text-muted); font-size: 0.9rem;">Initializing Computer Vision deskew, Otsu binarization, and signature cell ink density calculations...</p>
+            </div>
+        </div>
+
+        <!-- TAB 2: ATTENDANCE SUMMARY -->
+        <div id="tab-summary" class="tab-panel">
+            
+            <!-- Global Stats Bar -->
+            <div class="grid-4">
+                <div class="card stat-card">
+                    <div class="stat-icon indigo">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    </div>
+                    <div>
+                        <div class="stat-val" id="stat-sessions">0</div>
+                        <div class="stat-lbl">Processed Sessions</div>
+                    </div>
+                </div>
+
+                <div class="card stat-card">
+                    <div class="stat-icon cyan">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                    </div>
+                    <div>
+                        <div class="stat-val" id="stat-students">0</div>
+                        <div class="stat-lbl">Enrolled Students</div>
+                    </div>
+                </div>
+
+                <div class="card stat-card">
+                    <div class="stat-icon emerald">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div>
+                        <div class="stat-val" id="stat-rate">0%</div>
+                        <div class="stat-lbl">Overall Attendance Rate</div>
+                    </div>
+                </div>
+
+                <div class="card stat-card">
+                    <div class="stat-icon rose">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div>
+                        <div class="stat-val" id="stat-absents">0</div>
+                        <div class="stat-lbl">Total Absences</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visual Charts Row -->
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Session Attendance Trend</h3>
+                    </div>
+                    <div style="height: 280px; position: relative;">
+                        <canvas id="trend-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Overall Distribution</h3>
+                    </div>
+                    <div style="height: 280px; position: relative;">
+                        <canvas id="pie-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Student Attendance Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Student Attendance Breakdown</h3>
+                    <div class="search-box">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <input type="text" id="student-search" placeholder="Search by student index or name..." onkeyup="filterStudentTable()">
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table" id="students-table">
+                        <thead>
+                            <tr>
+                                <th>Index</th>
+                                <th>Student Name</th>
+                                <th>Attended / Total</th>
+                                <th>Attendance %</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="students-table-body">
+                            <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No attendance records found in database. Process some images to generate summary.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: CV PIPELINE INSPECTOR -->
+        <div id="tab-inspector" class="tab-panel">
+            <div class="card" style="margin-bottom: 1.5rem;">
+                <div class="card-header">
+                    <h3 class="card-title">Select Processed Sheet</h3>
+                    <select id="sheet-selector" onchange="loadSessionInspector(this.value)" style="background: rgba(15,23,42,0.9); border: 1px solid var(--glass-border); color: white; padding: 0.6rem 1.2rem; border-radius: var(--radius-md); font-weight: 600; font-size: 0.95rem; min-width: 260px;">
+                        <option value="">Select a processed sheet...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="inspector-content" style="display: none;">
+                <!-- Session Header Info -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.4rem;" id="inspector-sheet-title">Sheet 1.jpeg</h2>
+                            <p style="color: var(--text-muted); font-size: 0.9rem;" id="inspector-sheet-date">Date: 2025-01-06</p>
+                        </div>
+                        <div style="display: flex; gap: 1.5rem;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 1.3rem; font-weight: 700; color: #34d399;" id="inspector-present-count">0</div>
+                                <div style="font-size: 0.78rem; color: var(--text-muted);">PRESENT</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 1.3rem; font-weight: 700; color: #fb7185;" id="inspector-absent-count">0</div>
+                                <div style="font-size: 0.78rem; color: var(--text-muted);">ABSENT</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Computer Vision Steps Gallery -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
+                        <h3 class="card-title">Computer Vision Step Pipeline (Click image to inspect)</h3>
+                    </div>
+                    <div class="steps-grid" id="steps-gallery"></div>
+                </div>
+
+                <!-- Session Students Ink Density List -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Signature Ink Density Results</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Index</th>
+                                    <th>Student Name</th>
+                                    <th>Status</th>
+                                    <th>Ink Density %</th>
+                                    <th>Meter</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inspector-students-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>SAMS - Student Attendance Management System &copy; 2026 | Computer Graphics & Visualization</p>
+    </footer>
+
+    <!-- Image Lightbox Modal -->
+    <div id="image-modal" class="modal-overlay" onclick="closeImageModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeImageModal()">&times;</button>
+            <h3 id="modal-image-title" style="font-family: 'Outfit', sans-serif; font-size: 1.2rem;">Pipeline Step Preview</h3>
+            <img id="modal-image-src" class="modal-img" src="" alt="Processing Step">
+        </div>
+    </div>
+
+    <!-- Student Detail History Modal -->
+    <div id="student-modal" class="modal-overlay" onclick="closeStudentModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeStudentModal()">&times;</button>
+            <h3 id="modal-student-name" style="font-family: 'Outfit', sans-serif; font-size: 1.3rem;">Student Details</h3>
+            <p id="modal-student-index" style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;"></p>
+            
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Sheet Name</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modal-student-history"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

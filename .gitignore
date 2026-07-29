@@ -1,0 +1,55 @@
+# Python cache & compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# SQLite Database created at runtime
+attendance.db
+*.sqlite
+*.sqlite3
+*.db
+
+# Dynamic outputs & generated processing step images
+outputs/processing_steps/*
+!outputs/processing_steps/.gitkeep
+outputs/*.png
+outputs/*.jpg
+
+# Uploaded user files
+uploads/*
+!uploads/.gitkeep
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*~
+*.sublime-project
+*.sublime-workspace
+
+# OS junk
+.DS_Store
+Thumbs.db
