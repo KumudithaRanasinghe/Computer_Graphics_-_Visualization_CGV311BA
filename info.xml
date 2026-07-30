@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<attendance_info>
+    <subject>
+        <code>CS402.3</code>
+        <name>Computer Graphics and Visualization</name>
+        <year>2026-2027</year>
+    </subject>
+    <sessions>
+        <session date="2025-01-06" sheet="1.jpeg">
+            <students>
+                <student index="10000409" name="M S Dilshanika Perera"/>
+                <student index="10009301" name="C W M A Shehan Abeyrathne"/>
+                <student index="10009302" name="B A K M Chithrananda"/>
+                <student index="10009303" name="W Shashini Minosha De Silva"/>
+                <student index="10009304" name="K L Udara Maduranga Liyanage"/>
+                <student index="10009306" name="Hansa Anuradha Wickramanayake"/>
+            </students>
+        </session>
+        <session date="2025-01-13" sheet="2.jpeg">
+            <students>
+                <student index="10000409" name="M S Dilshanika Perera"/>
+                <student index="10009301" name="C W M A Shehan Abeyrathne"/>
+                <student index="10009302" name="B A K M Chithrananda"/>
+                <student index="10009303" name="W Shashini Minosha De Silva"/>
+                <student index="10009304" name="K L Udara Maduranga Liyanage"/>
+                <student index="10009306" name="Hansa Anuradha Wickramanayake"/>
+            </students>
+        </session>
+        <session date="2025-01-20" sheet="3.jpeg">
+            <students>
+                <student index="10000409" name="M S Dilshanika Perera"/>
+                <student index="10009301" name="C W M A Shehan Abeyrathne"/>
+                <student index="10009302" name="B A K M Chithrananda"/>
+                <student index="10009303" name="W Shashini Minosha De Silva"/>
+                <student index="10009304" name="K L Udara Maduranga Liyanage"/>
+                <student index="10009306" name="Hansa Anuradha Wickramanayake"/>
+            </students>
+        </session>
+        <session date="2025-01-27" sheet="4.jpeg">
+            <students>
+                <student index="10000409" name="M S Dilshanika Perera"/>
+                <student index="10009301" name="C W M A Shehan Abeyrathne"/>
+                <student index="10009302" name="B A K M Chithrananda"/>
+                <student index="10009303" name="W Shashini Minosha De Silva"/>
+                <student index="10009304" name="K L Udara Maduranga Liyanage"/>
+                <student index="10009306" name="Hansa Anuradha Wickramanayake"/>
+            </students>
+        </session>
+        <session date="2025-02-03" sheet="5.jpeg">
+            <students>
+                <student index="10000409" name="M S Dilshanika Perera"/>
+                <student index="10009301" name="C W M A Shehan Abeyrathne"/>
+                <student index="10009302" name="B A K M Chithrananda"/>
+                <student index="10009303" name="W Shashini Minosha De Silva"/>
+                <student index="10009304" name="K L Udara Maduranga Liyanage"/>
+                <student index="10009306" name="Hansa Anuradha Wickramanayake"/>
+            </students>
+        </session>
+    </sessions>
+</attendance_info>
