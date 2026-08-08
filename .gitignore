@@ -31,6 +31,7 @@ attendance.db
 *.sqlite
 *.sqlite3
 *.db
+!attendance.db
 
 # Dynamic outputs & generated processing step images
 outputs/processing_steps/*
